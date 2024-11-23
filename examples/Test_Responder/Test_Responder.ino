@@ -1,57 +1,3 @@
-/*
- * MIT License
- * 
- * Copyright (c) 2018 Michele Biondi, Andrea Salvatori
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
-*/
-
-/*
- * Copyright (c) 2015 by Thomas Trojer <thomas@trojer.net>
- * Decawave DW1000 library for arduino.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- * @file RangingAnchor.ino
- * Use this to test two-way ranging functionality with two
- * DW1000Jang:: This is the anchor component's code which computes range after
- * exchanging some messages. Addressing and frame filtering is currently done
- * in a custom way, as no MAC features are implemented yet.
- *
- * Complements the "RangingTag" example sketch.
- *
- * @todo
- *  - weighted average of ranging results based on signal quality
- *  - use enum instead of define
- *  - move strings to flash (less RAM consumption)
- */
-
 #include <DW1000Jang.hpp>
 #include <DW1000JangUtils.hpp>
 #include <DW1000JangTime.hpp>
@@ -134,13 +80,14 @@ void setup() {
 
 const uint16_t RECEIVE_MODE_DELAY = 1550;
 const uint16_t POLL_RESP_DELAY = 1700;
-const uint32_t LIGHT_VELOCITY = 3 * 10e8;
-const uint32_t FREQ_CH3 = 2 * (4492.8 * 10e6);
-const uint32_t LAMBDA = LIGHT_VELOCITY / FREQ_CH3;
+
+const double LIGHT_VELOCITY = 3 * 10e8;
+const double FREQ_CH3 = 2 * (4492.8 * 10e6);
+const double LAMBDA = LIGHT_VELOCITY / FREQ_CH3;
 
 void loop() {
 
-    double range;
+    double dist_twr;
     if(!DW1000JangRTLS::receiveFrame()) {
         return;
     }
@@ -190,7 +137,7 @@ void loop() {
                       if (rpostfinal_len > 9 && rpostfinal_data[9] == RANGING_TAG_POST_FINAL_RESPONSE_EMBEDDED) {
                         double phasePostFinal = DW1000Jang::getReceivedPhase(); //PostFinal Message를 받고 위상을 얻는 작업
 
-                        range = DW1000JangRanging::computeRangeAsymmetric(
+                        dist_twr = DW1000JangRanging::computeRangeAsymmetric(
                             timePollSent, // Poll send time
                             timePollReceived, 
                             timeResponseToPoll, // Response to poll sent time
@@ -199,8 +146,8 @@ void loop() {
                             timeFinalMessageReceive // Final message receive time
                         ); // timestamp를 저장한 변수들을 가지고 거리를 계산하는 작업
 
-                        if (range <= 0) {
-                            range = 0.000001;
+                        if (dist_twr <= 0) {
+                            dist_twr = 0.000001;
                         }
 
                         double sumPollResp = fmod((phasePoll + phaseResponse), 2 * PI);
@@ -217,12 +164,15 @@ void loop() {
                         if (recPhase < 0) {
                             recPhase += 2 * PI;
                         }
-
                         
+                        // int N = floor(dist_twr / LAMBDA);
+                        // double dist = ((recPhase / (2 * PI)) + N) * LAMBDA;
+										
+                        // Serial.println(dist);
 
-                        // Serial.print(recPhase);
-                        // Serial.print("|");
-                        // Serial.println(range); // 거리 출력
+                        Serial.print(recPhase);
+                        Serial.print("|");
+                        Serial.println(dist_twr);
                       }
                     }
                 }
