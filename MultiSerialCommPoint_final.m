@@ -46,7 +46,7 @@ disp('Data collection complete.');
 %% 시리얼 포트 닫기
 for i = 1:numArduinos
     clear serialObjects{i};
-    disp(['Closed serial port: ', portNames{i}]);
+    disp(['Closed serial prot: ', portNames{i}]);
 end
 
 %% 거리 계산(후자 방식)
@@ -56,53 +56,61 @@ for i = 1:numArduinos
     distMatrix(i,:) = medfilt1(distMatrix(i,:), 40);
 end
 
-%% AP의 좌표 (4개의 AP 중 하나를 원점으로 설정)
-apCoords = [0, 0.42;  % Responder05
-            0, 0;  % Responder06 (원점)
-            0.42, 0.42;  % Responder07
-            0.42, 0]; % Responder08
+%% AP 좌표 설정
+AP_coords = [0, 0, 0;  % AP1
+             1, 0, 0;  % AP2
+             0, 1, 0;  % AP3
+             0, 0, 1]; % AP4
+         
+%% 평면 방정식 설정 (AP 평면 계산)
+% 법선 벡터 계산 (AP1, AP2, AP3 사용)
+normal_vector = cross(AP_coords(2,:) - AP_coords(1,:), AP_coords(3,:) - AP_coords(1,:));
+D = -dot(normal_vector, AP_coords(1,:)); % 평면 상수
+plane = [normal_vector, D];
 
-z = 1.2; % 두 평면 사이의 거리 (알고 있는 값)
-
-%% 타겟의 좌표 계산
-targetCoords = zeros(2, numCycles); % (x, y) 좌표 저장
+%% 타겟 좌표 계산 및 투영
+targetProjected = zeros(3, numCycles); % 평면 투영 좌표 저장
 
 for cycle = 1:numCycles
-    % 원래 측정된 거리 데이터
-    d1 = distMatrix(1, cycle);
-    d2 = distMatrix(2, cycle);
-    d3 = distMatrix(3, cycle);
-    d4 = distMatrix(4, cycle);
-
-    % 피타고라스 정리를 이용해 평면 상으로 투사된 거리 계산
-    d1_proj = sqrt(d1^2 - z^2);
-    d2_proj = sqrt(d2^2 - z^2);
-    d3_proj = sqrt(d3^2 - z^2);
-    d4_proj = sqrt(d4^2 - z^2);
-
-    % AP 좌표
-    x1 = apCoords(1, 1); y1 = apCoords(1, 2);
-    x2 = apCoords(2, 1); y2 = apCoords(2, 2);
-    x3 = apCoords(3, 1); y3 = apCoords(3, 2);
-    x4 = apCoords(4, 1); y4 = apCoords(4, 2);
-
-    % 방정식 구성
-    A = [2*(x2-x1), 2*(y2-y1);
-         2*(x3-x1), 2*(y3-y1);
-         2*(x4-x1), 2*(y4-y1)];
-    b = [d1_proj^2 - d2_proj^2 - x1^2 + x2^2 - y1^2 + y2^2;
-         d1_proj^2 - d3_proj^2 - x1^2 + x3^2 - y1^2 + y3^2;
-         d1_proj^2 - d4_proj^2 - x1^2 + x4^2 - y1^2 + y4^2];
-
-    % 최소자승법으로 좌표 계산
-    coord = pinv(A) * b;
-    targetCoords(:, cycle) = coord;
+    % 거리 데이터 사용하여 타겟 3D 좌표 계산
+    distances = distMatrix(:, cycle)';
+    target3D = findTarget3D(AP_coords, distances); % 타겟 3D 좌표 계산
+    
+    % 타겟 좌표를 평면으로 투영
+    projected = projectToPlane(target3D, plane);
+    targetProjected(:, cycle) = projected;
 end
 
-%% 좌표 플롯
+disp('Target projection completed.');
+
+%% 플롯
 figure;
-plot(targetCoords(1, :), targetCoords(2, :), 'b.');
-title('Target Position Projected onto 2D Plane');
-xlabel('X [m]');
-ylabel('Y [m]');
+plot3(targetProjected(1,:), targetProjected(2,:), targetProjected(3,:), 'o');
 grid on;
+title('Projected Target Coordinates on Responder Plane');
+xlabel('X');
+ylabel('Y');
+zlabel('Z');
+
+%% 타겟 3D 좌표 계산 함수
+function target = findTarget3D(AP_coords, distances)
+    options = optimoptions('fsolve', 'Display', 'off');
+    initial_guess = [0, 0, 0]; % 초기 추정값
+    target = fsolve(@(pos) equations(pos, AP_coords, distances), initial_guess, options);
+end
+
+function F = equations(pos, AP_coords, distances)
+    F = zeros(4, 1);
+    for i = 1:4
+        F(i) = sqrt((pos(1) - AP_coords(i, 1))^2 + ...
+                    (pos(2) - AP_coords(i, 2))^2 + ...
+                    (pos(3) - AP_coords(i, 3))^2) - distances(i);
+    end
+end
+
+%% 평면 투영 함수
+function projected = projectToPlane(target, plane)
+    A = plane(1); B = plane(2); C = plane(3); D = plane(4);
+    d_proj = (A*target(1) + B*target(2) + C*target(3) + D) / sqrt(A^2 + B^2 + C^2);
+    projected = target - d_proj * [A, B, C] / sqrt(A^2 + B^2 + C^2);
+end
