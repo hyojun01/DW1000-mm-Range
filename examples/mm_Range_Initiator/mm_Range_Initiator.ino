@@ -104,7 +104,7 @@ void loop() {
         size_t cont_len = DW1000Jang::getReceivedDataLength();
         byte cont_recv[cont_len];
         DW1000Jang::getReceivedData(cont_recv, cont_len);
-
+ 
         if (cont_len > 10 && cont_recv[9] == ACTIVITY_CONTROL && cont_recv[10] == RANGING_CONTINUE) 
         {
             /* Received Response to poll */
