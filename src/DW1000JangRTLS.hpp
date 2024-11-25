@@ -122,6 +122,7 @@ namespace DW1000JangRTLS {
     void transmitTwrShortBlink();
     void transmitRangingInitiation(byte tag_eui[], byte tag_short_address[]);
     void transmitPoll(byte anchor_address[]);
+    void transmitPoll_v2(byte anchor_address[]);
     void transmitResponseToPoll(byte tag_short_address[]);
     uint64_t transmitResponseToPoll_v2(byte anchor_address[], uint16_t reply_delay);
     void transmitResponseToPoll_v3(byte anchor_address[], uint16_t reply_delay);

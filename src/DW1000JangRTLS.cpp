@@ -67,6 +67,26 @@ namespace DW1000JangRTLS
         DW1000Jang::startTransmit();
     }
 
+    void transmitPoll_v2(byte anchor_address[]){
+        byte futureTimeBytes[LENGTH_TIMESTAMP];
+
+        uint64_t timeFinalMessageSent = DW1000Jang::getSystemTimestamp();
+	    timeFinalMessageSent += DW1000JangTime::microsecondsToUWBTime(1000);
+        DW1000JangUtils::writeValueToBytes(futureTimeBytes, timeFinalMessageSent, LENGTH_TIMESTAMP);
+        DW1000Jang::setDelayedTRX(futureTimeBytes);
+        timeFinalMessageSent += DW1000Jang::getTxAntennaDelay();
+
+        byte Poll[] = {DATA, SHORT_SRC_AND_DEST, SEQ_NUMBER++, 0,0, 0,0, 
+        0,0 , RANGING_TAG_POLL,
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
+
+        DW1000Jang::getNetworkId(&Poll[3]);
+        memcpy(&Poll[5], anchor_address, 2);
+        DW1000Jang::getDeviceAddress(&Poll[7]);
+        DW1000Jang::setTransmitData(Poll, sizeof(Poll));
+        DW1000Jang::startTransmit(TransmitMode::DELAYED);
+    }
+
     void transmitResponseToPoll(byte tag_short_address[]) {
         byte pollAck[] = {DATA, SHORT_SRC_AND_DEST, SEQ_NUMBER++, 0,0, 0,0, 
         0,0, ACTIVITY_CONTROL, RANGING_CONTINUE, 0, 0};
